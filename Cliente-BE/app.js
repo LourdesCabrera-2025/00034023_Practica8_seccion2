@@ -26,7 +26,7 @@ app.use(
 app.use(cors());
 
 function verifyToken(req, res, next) {
-    const authHeader = req.header["authorization"];
+    const authHeader = req.headers["authorization"];
     if (!authHeader) return res.status(401).json({ error: "Token requerido" });
     const parts = authHeader.split(" ");
     if (parts.length !== 2 || parts[0] !== "Bearer")
@@ -65,25 +65,14 @@ app.post("/signin", async (req, res) => {
     }
 });
 
-app.get("/users", verifyToken, async (req, res) => {
-    try {
-        const q = "SELECT id, name, email FROM users ORDER BY id ASC";
-        const { rows } = await pool.query(q);
-        res.json(rows);
-    } catch (err) {
-        console.error(err);
-        console.error(err);
-        res.status(500).json({ error: "error al obtener usuario" });
-    }
-});
-
 //INSERT USERS 
 app.post("/users", async (req, res) => {
     const { name, email, password } = req.body;
     try {
+        const hashedPassword = await bcrypt.hash(password, 10);
         const result = await pool.query(
-            "INSERT INTO users (name, email, password) VALUES ($1,$2,$3) RETURNING *"
-            [name, email, password]
+            "INSERT INTO users (name, email, password) VALUES ($1,$2,$3) RETURNING *",
+            [name, email, hashedPassword]
         );
         res.status(201).json(result.rows[0]);
     }catch(err) {
@@ -94,7 +83,7 @@ app.post("/users", async (req, res) => {
 
 app.get("/users", async (req, res) => {
     try {
-        const result = await pool.query("SELECT id,name, email, created_at FROM users ORDER BY id ASC");
+        const result = await pool.query("SELECT id,name, email FROM users ORDER BY id ASC");
         res.json(result.rows);
     }catch(err) {
         console.error(err);
@@ -105,16 +94,16 @@ app.get("/users", async (req, res) => {
 app.get("/users/:id", async (req,res) => {
     const {id} = req.params;
     try{
-        const result = await pool.query("SELECT id, name, email, created_at FROM users WHERE id=$1", [id]);
+        const result = await pool.query("SELECT id, name, email  FROM users WHERE id= $1", [id]);
         if(result.rows.length === 0) return res.status(404).json({error: "Usuario no encontrado"});
         res.json(result.rows[0]);
     }catch(err) {
-        console.error(err);
+        console.error("Detalles del error:", err);
         res.status(500).json({error: "Error al obtener usuario"});
     }
 });
 
-app.post("/users/:id", async (req, res) => {
+app.put("/users/:id", async (req, res) => {
     const {id} = req.params;
     const {name, email} = req.body;
     try{
@@ -130,7 +119,7 @@ app.post("/users/:id", async (req, res) => {
     }
 });
 
-app.put("/users/:id", async (req, res) => {
+app.delete("/users/:id", async (req, res) => {
     const { id } = req.params;
     try {
         const result = await pool.query(
